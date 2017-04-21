@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">greedygames</string>
+    <string name="title_activity_maps">Map</string>
+    <string name="content_authority">com.example.tushar.greedygames</string>
+</resources>
