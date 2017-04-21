@@ -1,9 +1,12 @@
 package com.example.tushar.greedygames;
 
+import android.app.ProgressDialog;
 import android.content.ContentResolver;
 import android.content.Context;
+import android.content.ContextWrapper;
 import android.content.SharedPreferences;
 import android.database.Cursor;
+import android.os.Environment;
 import android.os.Handler;
 import android.preference.PreferenceManager;
 import android.support.v4.app.FragmentActivity;
@@ -28,8 +31,13 @@ import com.google.maps.android.heatmaps.HeatmapTileProvider;
 import com.crystal.crystalrangeseekbar.interfaces.OnSeekbarChangeListener;
 import com.crystal.crystalrangeseekbar.widgets.CrystalSeekbar;
 import com.example.tushar.greedygames.provider.AccountContract;
+import com.example.tushar.greedygames.provider.Database;
 
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -80,10 +88,12 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     private View.OnClickListener mPlayListner = new View.OnClickListener() {
         @Override
         public void onClick(View v) {
+            i = 0;
             mSeekbar.setEnabled(false);
             playHeatmap();
         }
     };
+    private ProgressDialog mProgressDialog;
 
     private static SharedPreferences getSharedPreferences(final Context context) {
         return PreferenceManager.getDefaultSharedPreferences(context);
@@ -103,6 +113,7 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        mProgressDialog = new ProgressDialog(this);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_maps);
         // Obtain the SupportMapFragment and get notified when the map is ready to be used.
@@ -156,34 +167,56 @@ public class MapsActivity extends FragmentActivity implements OnMapReadyCallback
     }
 
     private void getData() {
-        Thread thread = new Thread() {
-            @Override
-            public void run() {
-                mReadFromFile = new ReadFromFile(MapsActivity.this);
-                try {
-                    mReadFromFile.readFromAssets(MapsActivity.this, "log.txt");
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
+        mProgressDialog.setMessage("processing : please wait");
+        mProgressDialog.setCanceledOnTouchOutside(false);
+        mProgressDialog.setCancelable(false);
+        mProgressDialog.show();
+        copyDataBase();
+    }
+
+    private void copyDataBase() {
+        ContextWrapper cw = new ContextWrapper(getApplicationContext());
+        File data = Environment.getDataDirectory();
+        File database = new File(data, "/data/" + BuildConfig.APPLICATION_ID + "/databases/");
+        database.mkdir();
+        Log.i("Database",
+                "New database is being copied to device!");
+        byte[] buffer = new byte[1024];
+        OutputStream myOutput = null;
+        int length;
+        // Open your local db as the input stream
+        InputStream myInput = null;
+        try {
+            myInput = this.getAssets().open(Database.DATABASE_NAME);
+            // transfer bytes from the inputfile to the
+            // outputfile
+            myOutput = new FileOutputStream(database + "/" + Database.DATABASE_NAME);
+            while ((length = myInput.read(buffer)) > 0) {
+                myOutput.write(buffer, 0, length);
             }
-        };
-        thread.start();
+            myOutput.close();
+            myOutput.flush();
+            myInput.close();
+            Log.i("Database",
+                    "New database has been copied to device!");
+
+
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+        mProgressDialog.dismiss();
     }
 
     @Override
     public void createHeatmap() {
+        if (mProgressDialog.isShowing()) {
+            mProgressDialog.dismiss();
+        }
         mDataList = mReadFromFile.getDataList();
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                List<LatLng> loctionList = new ArrayList<>();
-                for (int i = 0; i < mDataList.size(); i++) {
-                    Data data = mDataList.get(i);
-                    double lat = data.getLatitude();
-                    double lng = data.getLongitude();
-                    loctionList.add(new LatLng(lat, lng));
-                }
-                createHeatmap(loctionList);
+                queryDb(null, null);
             }
         });
     }

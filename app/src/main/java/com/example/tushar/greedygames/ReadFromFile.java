@@ -71,16 +71,11 @@ public class ReadFromFile {
             builder.withValues(values);
             batch.add(builder.build());
             mLine = reader.readLine();
-            i++;
-            if (i == 4000) {
-                mListener.createHeatmap();
-                i = 0;
-            }
         }
+        mListener.createHeatmap();
         applyBatch(context, batch);
         Log.d(TAG, "end");
         reader.close();
-        mListener.createHeatmap();
     }
 
     protected ContentProviderResult[] applyBatch(Context context,
